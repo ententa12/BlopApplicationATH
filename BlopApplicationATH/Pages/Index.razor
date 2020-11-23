@@ -1,0 +1,53 @@
+﻿@page "/"
+@using Azure
+@using Microsoft.AspNetCore.StaticFiles
+@using Microsoft.AspNetCore.Components.Forms
+@using BlazorInputFile
+@using Azure.Storage.Blobs.Models;
+
+@inject Azure.Storage.Blobs.BlobServiceClient bsc
+
+@{
+    var container = bsc.GetBlobContainerClient("pictures");
+    container.CreateIfNotExistsAsync();
+    var imageDatas = container.GetBlobs();
+}
+<div>
+    <label for="uploadFiles">Select File(s)</label>
+    <InputFile id="uploadFolder" multiple OnChange="HandleFileSelected" />
+    <button @onclick="UploadPictures" disabled="@(pictures == null)">Upload</button>
+</div>
+<div>
+    <div>
+        @foreach (var image in imageDatas)
+        {
+            string path = $"{bsc.Uri}pictures/{image.Name}";
+            <div>
+                <img src="@path" href="@path" width="200" height="200" />
+            </div>
+        }
+    </div>
+</div>
+@code {
+    IFileListEntry[] pictures;
+    BlobItem[] imageDatas;
+    void HandleFileSelected(IFileListEntry[] files)
+    {
+        pictures = files;
+    }
+
+    async Task UploadPictures()
+    {
+        var container = bsc.GetBlobContainerClient("pictures");
+        await container.CreateIfNotExistsAsync();
+        var bh = new BlobHttpHeaders();
+        bh.ContentType = "image/jpg";
+        foreach (var p in pictures)
+        {
+            var blobClient = container.GetBlobClient($"{Guid.NewGuid()}.jpg");
+            await blobClient.UploadAsync(p.Data);
+            await blobClient.SetHttpHeadersAsync(bh);
+        }
+        imageDatas = container.GetBlobs().ToArray();
+    }
+}
